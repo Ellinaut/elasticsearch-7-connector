@@ -31,7 +31,7 @@ abstract class AbstractPipelineManager implements PipelineManagerInterface
     /**
      * @return string
      */
-    abstract protected static function getPipelineName(): string;
+    abstract public static function getPipelineName(): string;
 
     /**
      * @return array
