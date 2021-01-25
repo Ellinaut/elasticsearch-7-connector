@@ -3,9 +3,8 @@
 namespace Ellinaut\ElasticsearchConnector;
 
 use Elasticsearch\Client;
-use Ellinaut\ElasticsearchConnector\Document\DocumentManagerInterface;
+use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
 use Ellinaut\ElasticsearchConnector\Connection\ConnectionFactoryInterface;
-use Ellinaut\ElasticsearchConnector\Exception\MissingDocumentManagerException;
 use Ellinaut\ElasticsearchConnector\Exception\MissingIndexManagerException;
 use Ellinaut\ElasticsearchConnector\Index\IndexManagerInterface;
 use Ellinaut\ElasticsearchConnector\Index\PipelineManagerInterface;
@@ -37,9 +36,9 @@ class ElasticsearchConnector
     private $pipelineManagers;
 
     /**
-     * @var DocumentManagerInterface[]
+     * @var DocumentMigratorInterface[]
      */
-    private $documentManagers = [];
+    private $documentMigrators = [];
 
     /**
      * @var Client|null
@@ -109,11 +108,11 @@ class ElasticsearchConnector
 
     /**
      * @param string $internalIndexName
-     * @param DocumentManagerInterface $documentManager
+     * @param DocumentMigratorInterface $documentMigrator
      */
-    public function addDocumentManager(string $internalIndexName, DocumentManagerInterface $documentManager): void
+    public function addDocumentMigrator(string $internalIndexName, DocumentMigratorInterface $documentMigrator): void
     {
-        $this->documentManagers[$internalIndexName] = $documentManager;
+        $this->documentMigrators[$internalIndexName] = $documentMigrator;
     }
 
     public function executeSetupProcess(): void
@@ -160,15 +159,15 @@ class ElasticsearchConnector
 
     /**
      * @param string $internalIndexName
-     * @return DocumentManagerInterface
+     * @return DocumentMigratorInterface
      */
-    public function getDocumentManager(string $internalIndexName): DocumentManagerInterface
+    public function getDocumentMigrator(string $internalIndexName): ?DocumentMigratorInterface
     {
         if (!array_key_exists($internalIndexName, $this->indexManagers)) {
-            throw new MissingDocumentManagerException($internalIndexName);
+            return null;
         }
 
-        return $this->documentManagers[$internalIndexName];
+        return $this->documentMigrators[$internalIndexName];
     }
 
     /**
@@ -216,7 +215,7 @@ class ElasticsearchConnector
         $this->getIndexManager($internalIndexName)->updateIndex(
             $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
             $this->getConnection(),
-            $this->getDocumentManager($internalIndexName)
+            $this->getDocumentMigrator($internalIndexName)
         );
     }
 
@@ -248,14 +247,17 @@ class ElasticsearchConnector
     /**
      * @param string $internalIndexName
      * @param string $id
-     * @param object $object
+     * @param array $document
      * @param string|null $pipeline
      */
-    public function indexDocument(string $internalIndexName, string $id, object $object, ?string $pipeline = null): void
-    {
+    public function indexDocument(
+        string $internalIndexName,
+        string $id,
+        array $document,
+        ?string $pipeline = null
+    ): void {
         if ($this->maxQueueSize <= 0) {
-            $this->indexDocumentImmediately($internalIndexName, $id, $object, $pipeline);
-
+            $this->indexDocumentImmediately($internalIndexName, $id, $document, $pipeline);
             return;
         }
 
@@ -271,7 +273,7 @@ class ElasticsearchConnector
                 '_id' => $id,
             ]
         ];
-        $this->executionQueue[] = $this->getDocumentManager($internalIndexName)->buildSourceFromObject($object);
+        $this->executionQueue[] = $document;
         $this->queueSize++;
 
         $this->executeQueueIfSizeReached();
@@ -280,20 +282,20 @@ class ElasticsearchConnector
     /**
      * @param string $internalIndexName
      * @param string $id
-     * @param object $object
+     * @param array $document
      * @param string|null $pipeline
      */
     public function indexDocumentImmediately(
         string $internalIndexName,
         string $id,
-        object $object,
+        array $document,
         ?string $pipeline = null
     ): void {
         $request = [
             'index' => $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
             'id' => $id,
             'refresh' => $this->forceRefresh,
-            'body' => $this->getDocumentManager($internalIndexName)->buildSourceFromObject($object),
+            'body' => $document,
         ];
 
         if ($pipeline) {
@@ -311,7 +313,6 @@ class ElasticsearchConnector
     {
         if ($this->maxQueueSize <= 0) {
             $this->deleteDocumentImmediately($internalIndexName, $id);
-
             return;
         }
 
@@ -391,31 +392,5 @@ class ElasticsearchConnector
         $parameters['index'] = implode(',', $indexNames);
 
         return $this->getConnection()->search($parameters);
-    }
-
-    /**
-     * @param array $result
-     * @return object[]
-     */
-    public function buildObjectsFromSearchResult(array $result): array
-    {
-        if (!array_key_exists('hits', $result) || !is_array($result['hits'])) {
-            return [];
-        }
-
-        if (!array_key_exists('hits', $result['hits']) || !is_array($result['hits']['hits'])) {
-            return [];
-        }
-
-        $objects = [];
-        foreach ($result['hits']['hits'] as $hit) {
-            $internalIndexName = $this->getIndexNameProvider()->getInternalIndexName($hit['_index']);
-            $objects[] = $this->getDocumentManager($internalIndexName)->buildObjectFromSource(
-                (string)$hit['_id'],
-                $hit['_source'] ?? []
-            );
-        }
-
-        return $objects;
     }
 }

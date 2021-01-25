@@ -3,7 +3,7 @@
 namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
-use Ellinaut\ElasticsearchConnector\Document\DocumentManagerInterface;
+use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
 use Ellinaut\ElasticsearchConnector\Exception\IndexAlreadyExistException;
 
 /**
@@ -38,12 +38,12 @@ abstract class AbstractIndexManager implements IndexManagerInterface
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @param DocumentManagerInterface $documentManager
+     * @param DocumentMigratorInterface|null $documentMigrator
      */
     public function updateIndex(
         string $externalIndexName,
         Client $connection,
-        DocumentManagerInterface $documentManager
+        ?DocumentMigratorInterface $documentMigrator = null
     ): void {
         $migrationIndexName = $externalIndexName . '__migrating';
 
@@ -57,7 +57,7 @@ abstract class AbstractIndexManager implements IndexManagerInterface
             ]
         );
 
-        $this->migrateDocuments($searchResult, $connection, $migrationIndexName, $documentManager);
+        $this->migrateDocuments($searchResult, $connection, $migrationIndexName, $documentMigrator);
 
         $context = $searchResult['_scroll_id'];
         while (true) {
@@ -70,7 +70,7 @@ abstract class AbstractIndexManager implements IndexManagerInterface
                 break;
             }
 
-            $this->migrateDocuments($scrollResult, $connection, $migrationIndexName, $documentManager);
+            $this->migrateDocuments($scrollResult, $connection, $migrationIndexName, $documentMigrator);
 
             $context = $scrollResult['_scroll_id'];
         }
@@ -123,20 +123,20 @@ abstract class AbstractIndexManager implements IndexManagerInterface
      * @param array $searchResult
      * @param Client $connection
      * @param string $toIndexName
-     * @param DocumentManagerInterface $documentManager
-     * @return mixed
+     * @param DocumentMigratorInterface|null $documentManager
+     * @return void
      */
     protected function migrateDocuments(
         array $searchResult,
         Client $connection,
         string $toIndexName,
-        DocumentManagerInterface $documentManager
+        ?DocumentMigratorInterface $documentManager = null
     ): void {
         foreach ($searchResult['hits']['hits'] as $hit) {
             $connection->index([
                 'index' => $toIndexName,
                 'id' => $hit['_id'],
-                'body' => $documentManager->migrateSourceFromPreviousSource($hit['_source'])
+                'body' => $documentManager ? $documentManager->migrate($hit['_source']) : $hit['_source']
             ]);
         }
     }

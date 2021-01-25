@@ -3,7 +3,7 @@
 namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
-use Ellinaut\ElasticsearchConnector\Document\DocumentManagerInterface;
+use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>
@@ -19,12 +19,12 @@ interface IndexManagerInterface
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @param DocumentManagerInterface $documentManager
+     * @param DocumentMigratorInterface|null $documentMigrator
      */
     public function updateIndex(
         string $externalIndexName,
         Client $connection,
-        DocumentManagerInterface $documentManager
+        ?DocumentMigratorInterface $documentMigrator = null
     ): void;
 
     /**
