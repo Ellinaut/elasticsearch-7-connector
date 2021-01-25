@@ -161,7 +161,7 @@ class ElasticsearchConnector
      */
     public function getExternalIndexName(string $internalIndexName): string
     {
-        return strtolower($this->indexNameProvider->provideExternalName($internalIndexName));
+        return $this->indexNameProvider->provideExternalName($internalIndexName);
     }
 
     /**
@@ -179,7 +179,7 @@ class ElasticsearchConnector
      */
     public function getExternalPipelineName(string $internalPipelineName): string
     {
-        return strtolower($this->pipelineNameProvider->provideExternalName($internalPipelineName));
+        return $this->pipelineNameProvider->provideExternalName($internalPipelineName);
     }
 
     /**
