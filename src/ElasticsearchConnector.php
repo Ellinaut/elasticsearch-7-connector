@@ -365,6 +365,18 @@ class ElasticsearchConnector
             return null;
         }
 
+        return $document;
+    }
+
+    /**
+     * @param string $internalIndexName
+     * @param string $id
+     * @return array|null
+     */
+    public function retrieveDocumentSource(string $internalIndexName, string $id): ?array
+    {
+        $document = $this->retrieveDocument($internalIndexName, $id);
+
         if (!array_key_exists('_source', $document) || !is_array($document['_source'])) {
             return null;
         }
