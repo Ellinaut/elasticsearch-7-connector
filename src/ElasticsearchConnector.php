@@ -137,11 +137,21 @@ class ElasticsearchConnector
     }
 
     /**
-     * @return IndexNameProviderInterface
+     * @param string $externalIndexName
+     * @return string
      */
-    public function getIndexNameProvider(): IndexNameProviderInterface
+    public function getInternalIndexName(string $externalIndexName): string
     {
-        return $this->indexNameProvider;
+        return $this->indexNameProvider->getInternalIndexName($externalIndexName);
+    }
+
+    /**
+     * @param string $internalIndexName
+     * @return string
+     */
+    public function getExternalIndexName(string $internalIndexName): string
+    {
+        return $this->indexNameProvider->getExternalIndexName($internalIndexName);
     }
 
     /**
@@ -175,7 +185,7 @@ class ElasticsearchConnector
      */
     public function createIndexIfNotExist(string $internalIndexName): void
     {
-        $indexName = $this->getIndexNameProvider()->getExternalIndexName($internalIndexName);
+        $indexName = $this->getExternalIndexName($internalIndexName);
         if ($this->getConnection()->indices()->exists(['index' => $indexName])) {
             return;
         }
@@ -189,7 +199,7 @@ class ElasticsearchConnector
     public function createIndex(string $internalIndexName): void
     {
         $this->getIndexManager($internalIndexName)->createIndex(
-            $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+            $this->getExternalIndexName($internalIndexName),
             $this->getConnection()
         );
     }
@@ -199,7 +209,7 @@ class ElasticsearchConnector
      */
     public function recreateIndex(string $internalIndexName): void
     {
-        $indexName = $this->getIndexNameProvider()->getExternalIndexName($internalIndexName);
+        $indexName = $this->getExternalIndexName($internalIndexName);
         if ($this->getConnection()->indices()->exists(['index' => $indexName])) {
             $this->deleteIndex($internalIndexName);
         }
@@ -213,7 +223,7 @@ class ElasticsearchConnector
     public function updateIndex(string $internalIndexName): void
     {
         $this->getIndexManager($internalIndexName)->updateIndex(
-            $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+            $this->getExternalIndexName($internalIndexName),
             $this->getConnection(),
             $this->getDocumentMigrator($internalIndexName)
         );
@@ -225,7 +235,7 @@ class ElasticsearchConnector
     public function deleteIndex(string $internalIndexName): void
     {
         $this->getIndexManager($internalIndexName)->deleteIndex(
-            $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+            $this->getExternalIndexName($internalIndexName),
             $this->getConnection()
         );
     }
@@ -269,7 +279,7 @@ class ElasticsearchConnector
 
         $this->executionQueue[] = [
             'index' => [
-                '_index' => $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+                '_index' => $this->getExternalIndexName($internalIndexName),
                 '_id' => $id,
             ]
         ];
@@ -292,7 +302,7 @@ class ElasticsearchConnector
         ?string $pipeline = null
     ): void {
         $request = [
-            'index' => $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+            'index' => $this->getExternalIndexName($internalIndexName),
             'id' => $id,
             'refresh' => $this->forceRefresh,
             'body' => $document,
@@ -318,7 +328,7 @@ class ElasticsearchConnector
 
         $this->executionQueue[] = [
             'delete' => [
-                '_index' => $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+                '_index' => $this->getExternalIndexName($internalIndexName),
                 '_id' => $id,
             ]
         ];
@@ -334,7 +344,7 @@ class ElasticsearchConnector
     public function deleteDocumentImmediately(string $internalIndexName, string $id): void
     {
         $this->getConnection()->delete([
-            'index' => $this->getIndexNameProvider()->getExternalIndexName($internalIndexName),
+            'index' => $this->getExternalIndexName($internalIndexName),
             'id' => $id,
             'refresh' => $this->forceRefresh,
         ]);
@@ -367,30 +377,43 @@ class ElasticsearchConnector
     }
 
     /**
-     * @param string $internalIndexName
      * @param array $parameters
+     * @param array $internalIndexNames
      * @return array
      */
-    public function executeSingleIndexSearch(string $internalIndexName, array $parameters): array
+    public function executeSearch(array $parameters, array $internalIndexNames = []): array
     {
-        $parameters['index'] = $this->getIndexNameProvider()->getExternalIndexName($internalIndexName);
-
-        return $this->getConnection()->search($parameters);
+        return $this->getConnection()->search(
+            $this->buildParametersWithIndex($parameters, $internalIndexNames)
+        );
     }
 
     /**
-     * @param string[] $internalIndexNames
      * @param array $parameters
+     * @param array $internalIndexNames
+     * @return int
+     */
+    public function executeCount(array $parameters, array $internalIndexNames = []): int
+    {
+        return (int)$this->getConnection()->count(
+            $this->buildParametersWithIndex($parameters, $internalIndexNames)
+        )['count'];
+    }
+
+    /**
+     * @param array $parameters
+     * @param array $internalIndexNames
      * @return array
      */
-    public function executeSearch(array $internalIndexNames, array $parameters): array
+    protected function buildParametersWithIndex(array $parameters, array $internalIndexNames = []): array
     {
         $indexNames = [];
         foreach ($internalIndexNames as $internalIndexName) {
-            $indexNames[] = $this->getIndexNameProvider()->getExternalIndexName($internalIndexName);
+            $indexNames[] = $this->getExternalIndexName($internalIndexName);
         }
-        $parameters['index'] = implode(',', $indexNames);
 
-        return $this->getConnection()->search($parameters);
+        $parameters['index'] = count($indexNames) > 0 ? implode(',', $indexNames) : '_all';
+
+        return $parameters;
     }
 }
