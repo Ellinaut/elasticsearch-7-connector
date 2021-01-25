@@ -9,7 +9,7 @@ use Ellinaut\ElasticsearchConnector\Exception\IndexAlreadyExistException;
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>
  */
-abstract class AbstractIndexManager implements IndexManagerInterface
+trait IndexManagerTrait
 {
     /**
      * @return array

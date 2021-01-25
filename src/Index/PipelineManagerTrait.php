@@ -7,8 +7,13 @@ use Elasticsearch\Client;
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>
  */
-abstract class AbstractPipelineManager implements PipelineManagerInterface
+trait PipelineManagerTrait
 {
+    /**
+     * @return array
+     */
+    abstract protected function getPipelineDefinition(): array;
+
     /**
      * @param string $externalPipelineName
      * @param Client $connection
@@ -29,9 +34,4 @@ abstract class AbstractPipelineManager implements PipelineManagerInterface
     {
         $connection->ingest()->deletePipeline(['id' => $externalPipelineName]);
     }
-
-    /**
-     * @return array
-     */
-    abstract protected function getPipelineDefinition(): array;
 }
