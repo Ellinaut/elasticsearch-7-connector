@@ -292,23 +292,23 @@ class ElasticsearchConnector
      * @param string $internalIndexName
      * @param string $id
      * @param array $document
-     * @param string|null $pipeline
+     * @param string|null $internalPipelineName
      */
     public function indexDocument(
         string $internalIndexName,
         string $id,
         array $document,
-        ?string $pipeline = null
+        ?string $internalPipelineName = null
     ): void {
         if ($this->maxQueueSize <= 0) {
-            $this->indexDocumentImmediately($internalIndexName, $id, $document, $pipeline);
+            $this->indexDocumentImmediately($internalIndexName, $id, $document, $internalPipelineName);
             return;
         }
 
-        if ($pipeline !== $this->queuePipeline) {
+        if ($internalPipelineName !== $this->queuePipeline) {
             // execute the queue with the last pipeline, so next commands can use the new one
             $this->executeQueueImmediately();
-            $this->queuePipeline = $pipeline;
+            $this->queuePipeline = $internalPipelineName;
         }
 
         $this->executionQueue[] = [
@@ -327,13 +327,13 @@ class ElasticsearchConnector
      * @param string $internalIndexName
      * @param string $id
      * @param array $document
-     * @param string|null $pipeline
+     * @param string|null $internalPipelineName
      */
     public function indexDocumentImmediately(
         string $internalIndexName,
         string $id,
         array $document,
-        ?string $pipeline = null
+        ?string $internalPipelineName = null
     ): void {
         $request = [
             'index' => $this->getExternalIndexName($internalIndexName),
@@ -342,8 +342,8 @@ class ElasticsearchConnector
             'body' => $document,
         ];
 
-        if ($pipeline) {
-            $request['pipeline'] = $pipeline;
+        if ($internalPipelineName) {
+            $request['pipeline'] = $this->getExternalPipelineName($internalPipelineName);
         }
 
         $this->getConnection()->index($request);
@@ -423,7 +423,7 @@ class ElasticsearchConnector
 
         $bulkRequest = ['body' => $this->executionQueue, 'refresh' => $this->forceRefresh];
         if ($this->queuePipeline) {
-            $bulkRequest['pipeline'] = $this->queuePipeline;
+            $bulkRequest['pipeline'] = $this->getExternalPipelineName($this->queuePipeline);
         }
 
         $this->getConnection()->bulk($bulkRequest);
