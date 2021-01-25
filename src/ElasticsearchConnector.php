@@ -8,7 +8,7 @@ use Ellinaut\ElasticsearchConnector\Connection\ConnectionFactoryInterface;
 use Ellinaut\ElasticsearchConnector\Exception\MissingIndexManagerException;
 use Ellinaut\ElasticsearchConnector\Index\IndexManagerInterface;
 use Ellinaut\ElasticsearchConnector\Index\PipelineManagerInterface;
-use Ellinaut\ElasticsearchConnector\IndexName\IndexNameProviderInterface;
+use Ellinaut\ElasticsearchConnector\NameProvider\NameProviderInterface;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>
@@ -21,9 +21,14 @@ class ElasticsearchConnector
     private $connectionFactory;
 
     /**
-     * @var IndexNameProviderInterface
+     * @var NameProviderInterface
      */
     private $indexNameProvider;
+
+    /**
+     * @var NameProviderInterface
+     */
+    private $pipelineNameProvider;
 
     /**
      * @var IndexManagerInterface[]
@@ -73,18 +78,21 @@ class ElasticsearchConnector
     /**
      * ElasticsearchConnector constructor.
      * @param ConnectionFactoryInterface $connectionFactory
-     * @param IndexNameProviderInterface $indexNameProvider
+     * @param NameProviderInterface $indexNameProvider
+     * @param NameProviderInterface $pipelineNameProvider
      * @param int $bulkSize
      * @param bool $forceRefresh
      */
     public function __construct(
         ConnectionFactoryInterface $connectionFactory,
-        IndexNameProviderInterface $indexNameProvider,
+        NameProviderInterface $indexNameProvider,
+        NameProviderInterface $pipelineNameProvider,
         int $bulkSize = 50,
         bool $forceRefresh = true
     ) {
         $this->connectionFactory = $connectionFactory;
         $this->indexNameProvider = $indexNameProvider;
+        $this->pipelineNameProvider = $pipelineNameProvider;
         $this->maxQueueSize = $bulkSize;
         $this->forceRefresh = $forceRefresh;
     }
@@ -142,7 +150,7 @@ class ElasticsearchConnector
      */
     public function getInternalIndexName(string $externalIndexName): string
     {
-        return $this->indexNameProvider->getInternalIndexName($externalIndexName);
+        return $this->indexNameProvider->provideInternalName($externalIndexName);
     }
 
     /**
@@ -151,7 +159,25 @@ class ElasticsearchConnector
      */
     public function getExternalIndexName(string $internalIndexName): string
     {
-        return $this->indexNameProvider->getExternalIndexName($internalIndexName);
+        return $this->indexNameProvider->provideExternalName($internalIndexName);
+    }
+
+    /**
+     * @param string $externalPipelineName
+     * @return string
+     */
+    public function getInternalPipelineName(string $externalPipelineName): string
+    {
+        return $this->pipelineNameProvider->provideInternalName($externalPipelineName);
+    }
+
+    /**
+     * @param string $internalPipelineName
+     * @return string
+     */
+    public function getExternalPipelineName(string $internalPipelineName): string
+    {
+        return $this->pipelineNameProvider->provideExternalName($internalPipelineName);
     }
 
     /**
