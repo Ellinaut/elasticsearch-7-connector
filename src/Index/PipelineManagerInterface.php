@@ -1,6 +1,6 @@
 <?php
 
-namespace Ellinaut\Index;
+namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
 

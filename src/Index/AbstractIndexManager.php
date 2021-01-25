@@ -1,10 +1,10 @@
 <?php
 
-namespace Ellinaut\Index;
+namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
-use Ellinaut\Document\DocumentManagerInterface;
-use Ellinaut\Exception\IndexAlreadyExistException;
+use Ellinaut\ElasticsearchConnector\Document\DocumentManagerInterface;
+use Ellinaut\ElasticsearchConnector\Exception\IndexAlreadyExistException;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>

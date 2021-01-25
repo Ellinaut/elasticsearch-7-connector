@@ -1,6 +1,6 @@
 <?php
 
-namespace Ellinaut\Document;
+namespace Ellinaut\ElasticsearchConnector\Document;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>

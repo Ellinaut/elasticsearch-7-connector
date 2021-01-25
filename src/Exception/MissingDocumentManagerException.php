@@ -1,6 +1,6 @@
 <?php
 
-namespace Ellinaut\Exception;
+namespace Ellinaut\ElasticsearchConnector\Exception;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>

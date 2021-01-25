@@ -1,6 +1,6 @@
 <?php
 
-namespace Ellinaut\IndexName;
+namespace Ellinaut\ElasticsearchConnector\IndexName;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>

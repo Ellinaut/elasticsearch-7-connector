@@ -1,9 +1,9 @@
 <?php
 
-namespace Ellinaut\Index;
+namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
-use Ellinaut\Document\DocumentManagerInterface;
+use Ellinaut\ElasticsearchConnector\Document\DocumentManagerInterface;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>

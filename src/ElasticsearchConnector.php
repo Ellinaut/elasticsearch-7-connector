@@ -1,15 +1,15 @@
 <?php
 
-namespace Ellinaut;
+namespace Ellinaut\ElasticsearchConnector;
 
 use Elasticsearch\Client;
-use Ellinaut\Document\DocumentManagerInterface;
+use Ellinaut\ElasticsearchConnector\Document\DocumentManagerInterface;
 use Ellinaut\ElasticsearchConnector\Connection\ConnectionFactoryInterface;
-use Ellinaut\Exception\MissingDocumentManagerException;
-use Ellinaut\Exception\MissingIndexManagerException;
-use Ellinaut\Index\IndexManagerInterface;
-use Ellinaut\Index\PipelineManagerInterface;
-use Ellinaut\IndexName\IndexNameProviderInterface;
+use Ellinaut\ElasticsearchConnector\Exception\MissingDocumentManagerException;
+use Ellinaut\ElasticsearchConnector\Exception\MissingIndexManagerException;
+use Ellinaut\ElasticsearchConnector\Index\IndexManagerInterface;
+use Ellinaut\ElasticsearchConnector\Index\PipelineManagerInterface;
+use Ellinaut\ElasticsearchConnector\IndexName\IndexNameProviderInterface;
 
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>
