@@ -10,28 +10,25 @@ use Elasticsearch\Client;
 abstract class AbstractPipelineManager implements PipelineManagerInterface
 {
     /**
+     * @param string $externalPipelineName
      * @param Client $connection
      */
-    public function createPipeline(Client $connection): void
+    public function createPipeline(string $externalPipelineName, Client $connection): void
     {
         $connection->ingest()->putPipeline([
-            'id' => static::getPipelineName(),
+            'id' => $externalPipelineName,
             'body' => $this->getPipelineDefinition()
         ]);
     }
 
     /**
+     * @param string $externalPipelineName
      * @param Client $connection
      */
-    public function deletePipeline(Client $connection): void
+    public function deletePipeline(string $externalPipelineName, Client $connection): void
     {
-        $connection->ingest()->deletePipeline(['id' => static::getPipelineName()]);
+        $connection->ingest()->deletePipeline(['id' => $externalPipelineName]);
     }
-
-    /**
-     * @return string
-     */
-    abstract public static function getPipelineName(): string;
 
     /**
      * @return array

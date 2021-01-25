@@ -107,11 +107,12 @@ class ElasticsearchConnector
     }
 
     /**
+     * @param string $internalPipelineName
      * @param PipelineManagerInterface $pipelineManager
      */
-    public function addPipelineManager(PipelineManagerInterface $pipelineManager): void
+    public function addPipelineManager(string $internalPipelineName, PipelineManagerInterface $pipelineManager): void
     {
-        $this->pipelineManagers[] = $pipelineManager;
+        $this->pipelineManagers[$internalPipelineName] = $pipelineManager;
     }
 
     /**
@@ -268,15 +269,21 @@ class ElasticsearchConnector
 
     public function createPipelines(): void
     {
-        foreach ($this->pipelineManagers as $pipelineManager) {
-            $pipelineManager->createPipeline($this->getConnection());
+        foreach ($this->pipelineManagers as $internalPipelineName => $pipelineManager) {
+            $pipelineManager->createPipeline(
+                $this->getExternalPipelineName($internalPipelineName),
+                $this->getConnection()
+            );
         }
     }
 
     public function deletePipelines(): void
     {
-        foreach ($this->pipelineManagers as $pipelineManager) {
-            $pipelineManager->deletePipeline($this->getConnection());
+        foreach ($this->pipelineManagers as $internalPipelineName => $pipelineManager) {
+            $pipelineManager->deletePipeline(
+                $this->getExternalPipelineName($internalPipelineName),
+                $this->getConnection()
+            );
         }
     }
 

@@ -10,12 +10,14 @@ use Elasticsearch\Client;
 interface PipelineManagerInterface
 {
     /**
+     * @param string $externalPipelineName
      * @param Client $connection
      */
-    public function createPipeline(Client $connection): void;
+    public function createPipeline(string $externalPipelineName, Client $connection): void;
 
     /**
+     * @param string $externalPipelineName
      * @param Client $connection
      */
-    public function deletePipeline(Client $connection): void;
+    public function deletePipeline(string $externalPipelineName, Client $connection): void;
 }
