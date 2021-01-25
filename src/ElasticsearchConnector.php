@@ -140,7 +140,7 @@ class ElasticsearchConnector
     public function getConnection(): Client
     {
         if (!$this->connection) {
-            $this->connectionFactory->createConnection();
+            $this->connection = $this->connectionFactory->createConnection();
         }
 
         return $this->connection;
@@ -268,9 +268,16 @@ class ElasticsearchConnector
         );
     }
 
-    public function createPipelines(): void
+    /**
+     * @param array|null $internalPipelineNames
+     */
+    public function createPipelines(?array $internalPipelineNames = null): void
     {
         foreach ($this->pipelineManagers as $internalPipelineName => $pipelineManager) {
+            if (is_array($internalPipelineNames) && !in_array($internalPipelineName, $internalPipelineNames, true)) {
+                continue;
+            }
+
             $pipelineManager->createPipeline(
                 $this->getExternalPipelineName($internalPipelineName),
                 $this->getConnection()
@@ -278,9 +285,16 @@ class ElasticsearchConnector
         }
     }
 
-    public function deletePipelines(): void
+    /**
+     * @param array|null $internalPipelineNames
+     */
+    public function deletePipelines(?array $internalPipelineNames = null): void
     {
         foreach ($this->pipelineManagers as $internalPipelineName => $pipelineManager) {
+            if (is_array($internalPipelineNames) && !in_array($internalPipelineName, $internalPipelineNames, true)) {
+                continue;
+            }
+
             $pipelineManager->deletePipeline(
                 $this->getExternalPipelineName($internalPipelineName),
                 $this->getConnection()

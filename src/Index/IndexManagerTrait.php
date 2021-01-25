@@ -23,7 +23,7 @@ trait IndexManagerTrait
      */
     public function createIndex(string $externalIndexName, Client $connection): void
     {
-        if ($connection->indices()->exists(['index' => $externalIndexName])) {
+        if ($this->indexExist($externalIndexName, $connection)) {
             throw new IndexAlreadyExistException($externalIndexName);
         }
 
@@ -45,8 +45,16 @@ trait IndexManagerTrait
         Client $connection,
         ?DocumentMigratorInterface $documentMigrator = null
     ): void {
+        if (!$this->indexExist($externalIndexName, $connection)) {
+            $this->createIndex($externalIndexName, $connection);
+            return;
+        }
+
         $migrationIndexName = $externalIndexName . '__migrating';
 
+        if ($this->indexExist($migrationIndexName, $connection)) {
+            $this->deleteIndex($migrationIndexName, $connection);
+        }
         $this->createIndex($migrationIndexName, $connection);
 
         // fetch documents from current index and store to new index
@@ -116,6 +124,10 @@ trait IndexManagerTrait
      */
     public function deleteIndex(string $externalIndexName, Client $connection): void
     {
+        if (!$this->indexExist($externalIndexName, $connection)) {
+            return;
+        }
+
         $connection->indices()->delete(['index' => $externalIndexName]);
     }
 
@@ -155,5 +167,15 @@ trait IndexManagerTrait
                 'body' => $hit['_source']
             ]);
         }
+    }
+
+    /**
+     * @param string $externalIndexName
+     * @param Client $connection
+     * @return bool
+     */
+    protected function indexExist(string $externalIndexName, Client $connection): bool
+    {
+        return $connection->indices()->exists(['index' => $externalIndexName]);
     }
 }
