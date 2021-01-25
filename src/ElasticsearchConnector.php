@@ -130,7 +130,7 @@ class ElasticsearchConnector
         $this->createPipelines();
 
         foreach (array_keys($this->indexManagers) as $internalIndexName) {
-            $this->recreateIndex($internalIndexName);
+            $this->createIndexIfNotExist($internalIndexName);
         }
     }
 
@@ -161,7 +161,7 @@ class ElasticsearchConnector
      */
     public function getExternalIndexName(string $internalIndexName): string
     {
-        return $this->indexNameProvider->provideExternalName($internalIndexName);
+        return strtolower($this->indexNameProvider->provideExternalName($internalIndexName));
     }
 
     /**
@@ -179,7 +179,7 @@ class ElasticsearchConnector
      */
     public function getExternalPipelineName(string $internalPipelineName): string
     {
-        return $this->pipelineNameProvider->provideExternalName($internalPipelineName);
+        return strtolower($this->pipelineNameProvider->provideExternalName($internalPipelineName));
     }
 
     /**
