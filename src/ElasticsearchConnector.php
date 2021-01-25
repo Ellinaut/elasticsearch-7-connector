@@ -3,6 +3,7 @@
 namespace Ellinaut\ElasticsearchConnector;
 
 use Elasticsearch\Client;
+use Elasticsearch\Common\Exceptions\Missing404Exception;
 use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
 use Ellinaut\ElasticsearchConnector\Connection\ConnectionFactoryInterface;
 use Ellinaut\ElasticsearchConnector\Exception\MissingIndexManagerException;
@@ -346,6 +347,29 @@ class ElasticsearchConnector
         }
 
         $this->getConnection()->index($request);
+    }
+
+    /**
+     * @param string $internalIndexName
+     * @param string $id
+     * @return array|null
+     */
+    public function retrieveDocument(string $internalIndexName, string $id): ?array
+    {
+        try {
+            $document = $this->getConnection()->get([
+                'index' => $this->getExternalIndexName($internalIndexName),
+                'id' => $id,
+            ]);
+        } catch (Missing404Exception $exception) {
+            return null;
+        }
+
+        if (!array_key_exists('_source', $document) || !is_array($document['_source'])) {
+            return null;
+        }
+
+        return $document['_source'];
     }
 
     /**
