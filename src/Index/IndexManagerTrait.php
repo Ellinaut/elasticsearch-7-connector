@@ -177,7 +177,7 @@ trait IndexManagerTrait
             $request[] = $documentManager ? $documentManager->migrate($hit['_source']) : $hit['_source'];
         }
 
-        $response = $connection->bulk($request);
+        $response = $connection->bulk(['body' => $request]);
         if ($responseHandler) {
             $responseHandler->handleResponse(__METHOD__, $response);
         }
