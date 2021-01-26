@@ -380,7 +380,7 @@ class ElasticsearchConnector
 
         $response = $this->getConnection()->index($request);
         if ($this->responseHandler) {
-            $this->responseHandler->handleResponse($response);
+            $this->responseHandler->handleResponse(__METHOD__, $response);
         }
     }
 
@@ -457,7 +457,7 @@ class ElasticsearchConnector
         ]);
 
         if ($this->responseHandler) {
-            $this->responseHandler->handleResponse($response);
+            $this->responseHandler->handleResponse(__METHOD__, $response);
         }
     }
 
@@ -482,7 +482,7 @@ class ElasticsearchConnector
 
         $response = $this->getConnection()->bulk($bulkRequest);
         if ($this->responseHandler) {
-            $this->responseHandler->handleResponse($response);
+            $this->responseHandler->handleResponse(__METHOD__, $response);
         }
 
         // clear queue

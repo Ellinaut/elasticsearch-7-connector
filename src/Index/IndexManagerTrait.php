@@ -39,7 +39,7 @@ trait IndexManagerTrait
         );
 
         if ($responseHandler) {
-            $responseHandler->handleResponse($response);
+            $responseHandler->handleResponse(__METHOD__, $response);
         }
     }
 
@@ -144,7 +144,7 @@ trait IndexManagerTrait
 
         $response = $connection->indices()->delete(['index' => $externalIndexName]);
         if ($responseHandler) {
-            $responseHandler->handleResponse($response);
+            $responseHandler->handleResponse(__METHOD__, $response);
         }
     }
 
@@ -179,7 +179,7 @@ trait IndexManagerTrait
 
         $response = $connection->bulk($request);
         if ($responseHandler) {
-            $responseHandler->handleResponse($response);
+            $responseHandler->handleResponse(__METHOD__, $response);
         }
     }
 

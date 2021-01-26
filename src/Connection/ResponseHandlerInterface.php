@@ -8,7 +8,8 @@ namespace Ellinaut\ElasticsearchConnector\Connection;
 interface ResponseHandlerInterface
 {
     /**
+     * @param string $method
      * @param array $response
      */
-    public function handleResponse(array $response): void;
+    public function handleResponse(string $method, array $response): void;
 }
