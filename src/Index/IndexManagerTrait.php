@@ -3,6 +3,7 @@
 namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
+use Ellinaut\ElasticsearchConnector\Connection\ResponseHandlerInterface;
 use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
 use Ellinaut\ElasticsearchConnector\Exception\IndexAlreadyExistException;
 
@@ -19,10 +20,13 @@ trait IndexManagerTrait
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @param callable|null $responseHandler
+     * @param ResponseHandlerInterface|null $responseHandler
      */
-    public function createIndex(string $externalIndexName, Client $connection, ?callable $responseHandler = null): void
-    {
+    public function createIndex(
+        string $externalIndexName,
+        Client $connection,
+        ?ResponseHandlerInterface $responseHandler = null
+    ): void {
         if ($this->indexExist($externalIndexName, $connection)) {
             throw new IndexAlreadyExistException($externalIndexName);
         }
@@ -34,8 +38,8 @@ trait IndexManagerTrait
             ]
         );
 
-        if (is_callable($responseHandler)) {
-            $responseHandler($response);
+        if ($responseHandler) {
+            $responseHandler->handleResponse($response);
         }
     }
 
@@ -43,13 +47,13 @@ trait IndexManagerTrait
      * @param string $externalIndexName
      * @param Client $connection
      * @param DocumentMigratorInterface|null $documentMigrator
-     * @param callable|null $responseHandler
+     * @param ResponseHandlerInterface|null $responseHandler
      */
     public function updateIndex(
         string $externalIndexName,
         Client $connection,
         ?DocumentMigratorInterface $documentMigrator = null,
-        ?callable $responseHandler = null
+        ?ResponseHandlerInterface $responseHandler = null
     ): void {
         if (!$this->indexExist($externalIndexName, $connection)) {
             $this->createIndex($externalIndexName, $connection, $responseHandler);
@@ -84,8 +88,7 @@ trait IndexManagerTrait
                 break;
             }
 
-            $this->moveDocuments($scrollResult, $connection, $migrationIndexName, $documentMigrator,
-                $responseHandler);
+            $this->moveDocuments($scrollResult, $connection, $migrationIndexName, $documentMigrator, $responseHandler);
 
             $context = $scrollResult['_scroll_id'];
         }
@@ -128,17 +131,20 @@ trait IndexManagerTrait
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @param callable|null $responseHandler
+     * @param ResponseHandlerInterface|null $responseHandler
      */
-    public function deleteIndex(string $externalIndexName, Client $connection, ?callable $responseHandler = null): void
-    {
+    public function deleteIndex(
+        string $externalIndexName,
+        Client $connection,
+        ?ResponseHandlerInterface $responseHandler = null
+    ): void {
         if (!$this->indexExist($externalIndexName, $connection)) {
             return;
         }
 
         $response = $connection->indices()->delete(['index' => $externalIndexName]);
-        if (is_callable($responseHandler)) {
-            $responseHandler($response);
+        if ($responseHandler) {
+            $responseHandler->handleResponse($response);
         }
     }
 
@@ -147,14 +153,14 @@ trait IndexManagerTrait
      * @param Client $connection
      * @param string $toIndexName
      * @param DocumentMigratorInterface|null $documentManager
-     * @param callable|null $responseHandler
+     * @param ResponseHandlerInterface|null $responseHandler
      */
     protected function moveDocuments(
         array $searchResult,
         Client $connection,
         string $toIndexName,
         ?DocumentMigratorInterface $documentManager = null,
-        ?callable $responseHandler = null
+        ?ResponseHandlerInterface $responseHandler = null
     ): void {
         if (count($searchResult['hits']['hits']) === 0) {
             return;
@@ -172,8 +178,8 @@ trait IndexManagerTrait
         }
 
         $response = $connection->bulk($request);
-        if (is_callable($responseHandler)) {
-            $responseHandler($response);
+        if ($responseHandler) {
+            $responseHandler->handleResponse($response);
         }
     }
 

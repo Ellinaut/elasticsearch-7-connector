@@ -3,6 +3,7 @@
 namespace Ellinaut\ElasticsearchConnector\Index;
 
 use Elasticsearch\Client;
+use Ellinaut\ElasticsearchConnector\Connection\ResponseHandlerInterface;
 use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
 
 /**
@@ -13,27 +14,35 @@ interface IndexManagerInterface
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @param callable|null $responseHandler
+     * @param ResponseHandlerInterface|null $responseHandler
      */
-    public function createIndex(string $externalIndexName, Client $connection, ?callable $responseHandler = null): void;
-
-    /**
-     * @param string $externalIndexName
-     * @param Client $connection
-     * @param DocumentMigratorInterface|null $documentMigrator
-     * @param callable|null $responseHandler
-     */
-    public function updateIndex(
+    public function createIndex(
         string $externalIndexName,
         Client $connection,
-        ?DocumentMigratorInterface $documentMigrator = null,
-        ?callable $responseHandler = null
+        ?ResponseHandlerInterface $responseHandler = null
     ): void;
 
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @param callable|null $responseHandler
+     * @param DocumentMigratorInterface|null $documentMigrator
+     * @param ResponseHandlerInterface|null $responseHandler
      */
-    public function deleteIndex(string $externalIndexName, Client $connection, ?callable $responseHandler = null): void;
+    public function updateIndex(
+        string $externalIndexName,
+        Client $connection,
+        ?DocumentMigratorInterface $documentMigrator = null,
+        ?ResponseHandlerInterface $responseHandler = null
+    ): void;
+
+    /**
+     * @param string $externalIndexName
+     * @param Client $connection
+     * @param ResponseHandlerInterface|null $responseHandler
+     */
+    public function deleteIndex(
+        string $externalIndexName,
+        Client $connection,
+        ?ResponseHandlerInterface $responseHandler = null
+    ): void;
 }
