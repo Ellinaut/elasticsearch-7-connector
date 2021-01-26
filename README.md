@@ -63,8 +63,8 @@ The `ElasticsearchConnector` provides some methods to manage indices. Each metho
 instance of `Ellinaut\ElasticsearchConnector\Index\IndexManagerInterface`. Each index requires an instance of this
 interface which have to be provided and registered to the connector by your application.
 
-To simplify your implementation, your can use the trait `Ellinaut\ElasticsearchConnector\Index\IndexManagerTrait`. This
-trait requires to you to implement the method `getIndexDefinition`, which have to provide the elasticsearch index
+To simplify your implementation, you can use the trait `Ellinaut\ElasticsearchConnector\Index\IndexManagerTrait`. This
+trait requires that you implement the method `getIndexDefinition`, which have to provide the elasticsearch index
 configuration as array. The trait uses this method and provides all methods required by the `IndexManagerInterface`.
 
 Here is an example how a custom `IndexManager` could look like:
@@ -144,16 +144,79 @@ Build in providers are:
 
 If you need a custom naming strategy, you can also implement the `NameProviderInterface` with your custom name provider.
 
+The name provider is given to the connector within the constructor.
+
 ## How to manage pipeline
 
-TODO
+The `ElasticsearchConnector` provides some methods to manage pipelines. Each method will result in one or more calls to
+an instance of `Ellinaut\ElasticsearchConnector\Index\PipelineManagerInterface`. Each pipeline requires an instance of
+this interface which have to be provided and registered to the connector by your application.
+
+To simplify your implementation, you can use the trait `Ellinaut\ElasticsearchConnector\Index\PipelineManagerTrait`.
+This trait requires that you implement the method `getPipelineDefinition`, which have to provide the elasticsearch
+pipeline configuration as array. The trait uses this method and provides all methods required by
+the `PipelineManagerInterface`.
+
+Here is an example how a custom `PipelineManager` could look like:
+
+```php
+    namespace App\PipelineManager;
+    
+    use Ellinaut\ElasticsearchConnector\Index\PipelineManagerInterface;
+    use Ellinaut\ElasticsearchConnector\Index\PipelineManagerTrait;
+
+    class CustomPipelineManager implements PipelineManagerInterface {
+        use PipelineManagerTrait;
+        
+        /**
+         * @return array
+         */
+        protected function getPipelineDefinition() : array{
+            return [
+                'description' => 'Your custom pipeline which converts content from field "test" to lowercase.',
+                'processors' => [
+                    [
+                        'lowercase' => [
+                            'field' => 'test',
+                        ],
+                    ],
+                ],
+            ];
+        }
+    }
+```
+
+To use your custom pipeline manager, you have to register it on the connector instance:
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    $elasticsearch->addPipelineManager('custom_pipeline', new App\PipelineManager\CustomPipelineManager());
+```
+
+Then you can use this pipeline through these connector method calls:
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    
+    // Creates all registered pipelines.
+    $elasticsearch->createPipelines();
+    
+    // Creates only the given pipeline.
+    $elasticsearch->createPipelines(['custom_pipeline']);
+    
+    // Deletes all registered pipelines.
+    $elasticsearch->deletePipelines();
+    
+    // Deletes only the given pipeline.
+    $elasticsearch->deletePipelines(['custom_pipeline']);
+```
 
 ### Pipeline Naming
 
 As with the indices also pipeline names could be different between PHP and elasticsearch. The name providers are the
 same as for indices.
 
-## How to manage document
+## How to manage documents
 
 TODO
 
