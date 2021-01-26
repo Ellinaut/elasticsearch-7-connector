@@ -12,12 +12,22 @@ interface PipelineManagerInterface
     /**
      * @param string $externalPipelineName
      * @param Client $connection
+     * @param callable|null $responseHandler
      */
-    public function createPipeline(string $externalPipelineName, Client $connection): void;
+    public function createPipeline(
+        string $externalPipelineName,
+        Client $connection,
+        ?callable $responseHandler = null
+    ): void;
 
     /**
      * @param string $externalPipelineName
      * @param Client $connection
+     * @param callable|null $responseHandler
      */
-    public function deletePipeline(string $externalPipelineName, Client $connection): void;
+    public function deletePipeline(
+        string $externalPipelineName,
+        Client $connection,
+        ?callable $responseHandler = null
+    ): void;
 }

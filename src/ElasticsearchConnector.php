@@ -125,12 +125,15 @@ class ElasticsearchConnector
         $this->documentMigrators[$internalIndexName] = $documentMigrator;
     }
 
-    public function executeSetupProcess(): void
+    /**
+     * @param callable|null $responseHandler
+     */
+    public function executeSetupProcess(?callable $responseHandler = null): void
     {
-        $this->createPipelines();
+        $this->createPipelines(null, $responseHandler);
 
         foreach (array_keys($this->indexManagers) as $internalIndexName) {
-            $this->createIndexIfNotExist($internalIndexName);
+            $this->createIndexIfNotExist($internalIndexName, $responseHandler);
         }
     }
 
@@ -210,68 +213,77 @@ class ElasticsearchConnector
 
     /**
      * @param string $internalIndexName
+     * @param callable|null $responseHandler
      */
-    public function createIndexIfNotExist(string $internalIndexName): void
+    public function createIndexIfNotExist(string $internalIndexName, ?callable $responseHandler = null): void
     {
         $indexName = $this->getExternalIndexName($internalIndexName);
         if ($this->getConnection()->indices()->exists(['index' => $indexName])) {
             return;
         }
 
-        $this->createIndex($internalIndexName);
+        $this->createIndex($internalIndexName, $responseHandler);
     }
 
     /**
      * @param string $internalIndexName
+     * @param callable|null $responseHandler
      */
-    public function createIndex(string $internalIndexName): void
+    public function createIndex(string $internalIndexName, ?callable $responseHandler = null): void
     {
         $this->getIndexManager($internalIndexName)->createIndex(
             $this->getExternalIndexName($internalIndexName),
-            $this->getConnection()
+            $this->getConnection(),
+            $responseHandler
         );
     }
 
     /**
      * @param string $internalIndexName
+     * @param callable|null $responseHandler
      */
-    public function recreateIndex(string $internalIndexName): void
+    public function recreateIndex(string $internalIndexName, ?callable $responseHandler = null): void
     {
         $indexName = $this->getExternalIndexName($internalIndexName);
         if ($this->getConnection()->indices()->exists(['index' => $indexName])) {
-            $this->deleteIndex($internalIndexName);
+            $this->deleteIndex($internalIndexName, $responseHandler);
         }
 
-        $this->createIndex($internalIndexName);
+        $this->createIndex($internalIndexName, $responseHandler);
     }
 
     /**
      * @param string $internalIndexName
+     * @param callable|null $responseHandler
      */
-    public function updateIndex(string $internalIndexName): void
+    public function updateIndex(string $internalIndexName, ?callable $responseHandler = null): void
     {
         $this->getIndexManager($internalIndexName)->updateIndex(
             $this->getExternalIndexName($internalIndexName),
             $this->getConnection(),
-            $this->getDocumentMigrator($internalIndexName)
+            $this->getDocumentMigrator($internalIndexName),
+            $responseHandler
         );
     }
 
     /**
      * @param string $internalIndexName
+     * @param callable|null $responseHandler
      */
-    public function deleteIndex(string $internalIndexName): void
+    public function deleteIndex(string $internalIndexName, ?callable $responseHandler = null): void
     {
         $this->getIndexManager($internalIndexName)->deleteIndex(
             $this->getExternalIndexName($internalIndexName),
-            $this->getConnection()
+            $this->getConnection(),
+            $responseHandler
         );
     }
 
     /**
      * @param array|null $internalPipelineNames
+     * @param callable|null $responseHandler
      */
-    public function createPipelines(?array $internalPipelineNames = null): void
+    public function createPipelines(?array $internalPipelineNames = null, ?callable $responseHandler = null): void
     {
         foreach ($this->pipelineManagers as $internalPipelineName => $pipelineManager) {
             if (is_array($internalPipelineNames) && !in_array($internalPipelineName, $internalPipelineNames, true)) {
@@ -280,15 +292,17 @@ class ElasticsearchConnector
 
             $pipelineManager->createPipeline(
                 $this->getExternalPipelineName($internalPipelineName),
-                $this->getConnection()
+                $this->getConnection(),
+                $responseHandler
             );
         }
     }
 
     /**
      * @param array|null $internalPipelineNames
+     * @param callable|null $responseHandler
      */
-    public function deletePipelines(?array $internalPipelineNames = null): void
+    public function deletePipelines(?array $internalPipelineNames = null, ?callable $responseHandler = null): void
     {
         foreach ($this->pipelineManagers as $internalPipelineName => $pipelineManager) {
             if (is_array($internalPipelineNames) && !in_array($internalPipelineName, $internalPipelineNames, true)) {
@@ -297,7 +311,8 @@ class ElasticsearchConnector
 
             $pipelineManager->deletePipeline(
                 $this->getExternalPipelineName($internalPipelineName),
-                $this->getConnection()
+                $this->getConnection(),
+                $responseHandler
             );
         }
     }
@@ -307,21 +322,29 @@ class ElasticsearchConnector
      * @param string $id
      * @param array $document
      * @param string|null $internalPipelineName
+     * @param callable|null $responseHandler
      */
     public function indexDocument(
         string $internalIndexName,
         string $id,
         array $document,
-        ?string $internalPipelineName = null
+        ?string $internalPipelineName = null,
+        ?callable $responseHandler = null
     ): void {
         if ($this->maxQueueSize <= 0) {
-            $this->indexDocumentImmediately($internalIndexName, $id, $document, $internalPipelineName);
+            $this->indexDocumentImmediately(
+                $internalIndexName,
+                $id,
+                $document,
+                $internalPipelineName,
+                $responseHandler
+            );
             return;
         }
 
         if ($internalPipelineName !== $this->queuePipeline) {
             // execute the queue with the last pipeline, so next commands can use the new one
-            $this->executeQueueImmediately();
+            $this->executeQueueImmediately($responseHandler);
             $this->queuePipeline = $internalPipelineName;
         }
 
@@ -334,7 +357,7 @@ class ElasticsearchConnector
         $this->executionQueue[] = $document;
         $this->queueSize++;
 
-        $this->executeQueueIfSizeReached();
+        $this->executeQueueIfSizeReached($responseHandler);
     }
 
     /**
@@ -342,12 +365,14 @@ class ElasticsearchConnector
      * @param string $id
      * @param array $document
      * @param string|null $internalPipelineName
+     * @param callable|null $responseHandler
      */
     public function indexDocumentImmediately(
         string $internalIndexName,
         string $id,
         array $document,
-        ?string $internalPipelineName = null
+        ?string $internalPipelineName = null,
+        ?callable $responseHandler = null
     ): void {
         $request = [
             'index' => $this->getExternalIndexName($internalIndexName),
@@ -360,7 +385,10 @@ class ElasticsearchConnector
             $request['pipeline'] = $this->getExternalPipelineName($internalPipelineName);
         }
 
-        $this->getConnection()->index($request);
+        $response = $this->getConnection()->index($request);
+        if (is_callable($responseHandler)) {
+            $responseHandler($response);
+        }
     }
 
     /**
@@ -390,6 +418,9 @@ class ElasticsearchConnector
     public function retrieveDocumentSource(string $internalIndexName, string $id): ?array
     {
         $document = $this->retrieveDocument($internalIndexName, $id);
+        if (!$document) {
+            return null;
+        }
 
         if (!array_key_exists('_source', $document) || !is_array($document['_source'])) {
             return null;
@@ -401,11 +432,12 @@ class ElasticsearchConnector
     /**
      * @param string $internalIndexName
      * @param string $id
+     * @param callable|null $responseHandler
      */
-    public function deleteDocument(string $internalIndexName, string $id): void
+    public function deleteDocument(string $internalIndexName, string $id, ?callable $responseHandler = null): void
     {
         if ($this->maxQueueSize <= 0) {
-            $this->deleteDocumentImmediately($internalIndexName, $id);
+            $this->deleteDocumentImmediately($internalIndexName, $id, $responseHandler);
             return;
         }
 
@@ -417,30 +449,44 @@ class ElasticsearchConnector
         ];
         $this->queueSize++;
 
-        $this->executeQueueIfSizeReached();
+        $this->executeQueueIfSizeReached($responseHandler);
     }
 
     /**
      * @param string $internalIndexName
      * @param string $id
+     * @param callable|null $responseHandler
      */
-    public function deleteDocumentImmediately(string $internalIndexName, string $id): void
-    {
-        $this->getConnection()->delete([
+    public function deleteDocumentImmediately(
+        string $internalIndexName,
+        string $id,
+        ?callable $responseHandler = null
+    ): void {
+        $response = $this->getConnection()->delete([
             'index' => $this->getExternalIndexName($internalIndexName),
             'id' => $id,
             'refresh' => $this->forceRefresh,
         ]);
-    }
 
-    protected function executeQueueIfSizeReached(): void
-    {
-        if ($this->queueSize >= $this->maxQueueSize) {
-            $this->executeQueueImmediately();
+        if (is_callable($responseHandler)) {
+            $responseHandler($response);
         }
     }
 
-    public function executeQueueImmediately(): void
+    /**
+     * @param callable|null $responseHandler
+     */
+    protected function executeQueueIfSizeReached(?callable $responseHandler = null): void
+    {
+        if ($this->queueSize >= $this->maxQueueSize) {
+            $this->executeQueueImmediately($responseHandler);
+        }
+    }
+
+    /**
+     * @param callable|null $responseHandler
+     */
+    public function executeQueueImmediately(?callable $responseHandler = null): void
     {
         // don't execute on empty queue
         if (count($this->executionQueue) === 0) {
@@ -452,7 +498,10 @@ class ElasticsearchConnector
             $bulkRequest['pipeline'] = $this->getExternalPipelineName($this->queuePipeline);
         }
 
-        $this->getConnection()->bulk($bulkRequest);
+        $response = $this->getConnection()->bulk($bulkRequest);
+        if (is_callable($responseHandler)) {
+            $responseHandler($response);
+        }
 
         // clear queue
         $this->queueSize = 0;

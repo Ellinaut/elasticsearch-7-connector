@@ -19,43 +19,49 @@ trait IndexManagerTrait
     /**
      * @param string $externalIndexName
      * @param Client $connection
-     * @throws IndexAlreadyExistException
+     * @param callable|null $responseHandler
      */
-    public function createIndex(string $externalIndexName, Client $connection): void
+    public function createIndex(string $externalIndexName, Client $connection, ?callable $responseHandler = null): void
     {
         if ($this->indexExist($externalIndexName, $connection)) {
             throw new IndexAlreadyExistException($externalIndexName);
         }
 
-        $connection->indices()->create(
+        $response = $connection->indices()->create(
             [
                 'index' => $externalIndexName,
                 'body' => $this->getIndexDefinition()
             ]
         );
+
+        if (is_callable($responseHandler)) {
+            $responseHandler($response);
+        }
     }
 
     /**
      * @param string $externalIndexName
      * @param Client $connection
      * @param DocumentMigratorInterface|null $documentMigrator
+     * @param callable|null $responseHandler
      */
     public function updateIndex(
         string $externalIndexName,
         Client $connection,
-        ?DocumentMigratorInterface $documentMigrator = null
+        ?DocumentMigratorInterface $documentMigrator = null,
+        ?callable $responseHandler = null
     ): void {
         if (!$this->indexExist($externalIndexName, $connection)) {
-            $this->createIndex($externalIndexName, $connection);
+            $this->createIndex($externalIndexName, $connection, $responseHandler);
             return;
         }
 
         $migrationIndexName = $externalIndexName . '__migrating';
 
         if ($this->indexExist($migrationIndexName, $connection)) {
-            $this->deleteIndex($migrationIndexName, $connection);
+            $this->deleteIndex($migrationIndexName, $connection, $responseHandler);
         }
-        $this->createIndex($migrationIndexName, $connection);
+        $this->createIndex($migrationIndexName, $connection, $responseHandler);
 
         // fetch documents from current index and store to new index
         $searchResult = $connection->search(
@@ -65,7 +71,7 @@ trait IndexManagerTrait
             ]
         );
 
-        $this->migrateDocuments($searchResult, $connection, $migrationIndexName, $documentMigrator);
+        $this->moveDocuments($searchResult, $connection, $migrationIndexName, $documentMigrator, $responseHandler);
 
         $context = $searchResult['_scroll_id'];
         while (true) {
@@ -78,16 +84,17 @@ trait IndexManagerTrait
                 break;
             }
 
-            $this->migrateDocuments($scrollResult, $connection, $migrationIndexName, $documentMigrator);
+            $this->moveDocuments($scrollResult, $connection, $migrationIndexName, $documentMigrator,
+                $responseHandler);
 
             $context = $scrollResult['_scroll_id'];
         }
 
         // remove old index
-        $this->deleteIndex($externalIndexName, $connection);
+        $this->deleteIndex($externalIndexName, $connection, $responseHandler);
 
         // recreate the index
-        $this->createIndex($externalIndexName, $connection);
+        $this->createIndex($externalIndexName, $connection, $responseHandler);
 
         // fetch documents from current index and store to new index
         $searchResult = $connection->search(
@@ -97,7 +104,7 @@ trait IndexManagerTrait
             ]
         );
 
-        $this->moveDocuments($searchResult, $connection, $externalIndexName);
+        $this->moveDocuments($searchResult, $connection, $externalIndexName, null, $responseHandler);
 
         $context = $searchResult['_scroll_id'];
         while (true) {
@@ -110,25 +117,29 @@ trait IndexManagerTrait
                 break;
             }
 
-            $this->moveDocuments($scrollResult, $connection, $externalIndexName);
+            $this->moveDocuments($scrollResult, $connection, $externalIndexName, null, $responseHandler);
 
             $context = $scrollResult['_scroll_id'];
         }
 
-        $this->deleteIndex($migrationIndexName, $connection);
+        $this->deleteIndex($migrationIndexName, $connection, $responseHandler);
     }
 
     /**
      * @param string $externalIndexName
      * @param Client $connection
+     * @param callable|null $responseHandler
      */
-    public function deleteIndex(string $externalIndexName, Client $connection): void
+    public function deleteIndex(string $externalIndexName, Client $connection, ?callable $responseHandler = null): void
     {
         if (!$this->indexExist($externalIndexName, $connection)) {
             return;
         }
 
-        $connection->indices()->delete(['index' => $externalIndexName]);
+        $response = $connection->indices()->delete(['index' => $externalIndexName]);
+        if (is_callable($responseHandler)) {
+            $responseHandler($response);
+        }
     }
 
     /**
@@ -136,36 +147,33 @@ trait IndexManagerTrait
      * @param Client $connection
      * @param string $toIndexName
      * @param DocumentMigratorInterface|null $documentManager
-     * @return void
+     * @param callable|null $responseHandler
      */
-    protected function migrateDocuments(
+    protected function moveDocuments(
         array $searchResult,
         Client $connection,
         string $toIndexName,
-        ?DocumentMigratorInterface $documentManager = null
+        ?DocumentMigratorInterface $documentManager = null,
+        ?callable $responseHandler = null
     ): void {
-        foreach ($searchResult['hits']['hits'] as $hit) {
-            $connection->index([
-                'index' => $toIndexName,
-                'id' => $hit['_id'],
-                'body' => $documentManager ? $documentManager->migrate($hit['_source']) : $hit['_source']
-            ]);
+        if (count($searchResult['hits']['hits']) === 0) {
+            return;
         }
-    }
 
-    /**
-     * @param array $searchResult
-     * @param Client $connection
-     * @param string $toIndexName
-     */
-    protected function moveDocuments(array $searchResult, Client $connection, string $toIndexName): void
-    {
+        $request = [];
         foreach ($searchResult['hits']['hits'] as $hit) {
-            $connection->index([
-                'index' => $toIndexName,
-                'id' => $hit['_id'],
-                'body' => $hit['_source']
-            ]);
+            $request[] = [
+                'index' => [
+                    '_index' => $toIndexName,
+                    '_id' => $hit['_id'],
+                ]
+            ];
+            $request[] = $documentManager ? $documentManager->migrate($hit['_source']) : $hit['_source'];
+        }
+
+        $response = $connection->bulk($request);
+        if (is_callable($responseHandler)) {
+            $responseHandler($response);
         }
     }
 
