@@ -146,7 +146,65 @@ If you need a custom naming strategy, you can also implement the `NameProviderIn
 
 The name provider is given to the connector within the constructor.
 
-## How to manage pipeline
+### Index Migrations
+
+By default, the `updateIndex` method work with these steps:
+
+1. Create the migration index (index name will be "INDEX_NAME__migrating")
+1. Fetch old documents from the old index
+1. Store old documents to the migration index
+1. Move all documents from the old index to the migration index
+1. Delete the old index
+1. Create the new index with the same name as the old index
+1. Move all documents form the migration index to the new index
+1. Delete the migration index
+
+This procedure might be useful for simple migrations where only a new field will be added or some analyzer or field
+configurations will be changed. If your migration requires data changes, you are able to provide an instance of
+`Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface` to the connector.
+
+Here is how your document migrator could look like:
+
+```php
+    namespace App\Document;
+
+    use Ellinaut\ElasticsearchConnector\Document\DocumentMigratorInterface;
+    
+    class CustomDocumentMigrator implements DocumentMigratorInterface {
+    
+        /**
+         * @param array $previousSource
+         * @return array
+         */
+        public function migrate(array $previousSource) : array{
+            if(!array_key_exists('test',$previousSource)){
+                $previousSource['test'] = 'Test';
+            }
+            
+            return $previousSource;
+        }
+    }
+```
+
+It can be added to the connector like this:
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    $elasticsearch->addDocumentMigrator('custom_index', new App\Document\CustomDocumentMigrator());
+```
+
+If you have added a document migrator to the connector, the new procedure for `updateIndex` will be:
+
+1. Create the migration index (index name will be "INDEX_NAME__migrating")
+1. Fetch old documents from the old index
+1. Migrate old documents with the document migrator
+1. Store migrated documents to the migration index
+1. Delete the old index
+1. Create the new index with the same name as the old index
+1. Move all documents form the migration index to the new index
+1. Delete the migration index
+
+## How to manage pipelines
 
 The `ElasticsearchConnector` provides some methods to manage pipelines. Each method will result in one or more calls to
 an instance of `Ellinaut\ElasticsearchConnector\Index\PipelineManagerInterface`. Each pipeline requires an instance of
@@ -218,15 +276,176 @@ same as for indices.
 
 ## How to manage documents
 
-TODO
+The `ElasticsearchConnector` provides some methods to manage documents. You should use the method `indexDocument` to
+create or update a document. You should use the method `deleteDocument` to delete a document by ID. You could also
+use `indexDocumentImmediately` or `deleteDocumentImmediately` if you don't want to use bulk requests. You can retrieve
+single documents via methods `retrieveDocument` or `retrieveDocumentSource`.
+
+See how it looks like in your code:
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    
+    // Index the document with ID "document_1" into the index "custom_index" and use pipeline "custom_pipeline".
+    // Document is index via queue system which uses bulk requests internally. Recommended method to index documents.
+    $elasticsearch->indexDocument('custom_index','document_1', ['test'=>'Test'],'custom_pipeline');
+    
+    // Index the document with ID "document_1" into the index "custom_index" and use pipeline "custom_pipeline".
+    // Document is indexed immediately to elasticsearch.
+    $elasticsearch->indexDocumentImmediately('custom_index','document_1', ['test'=>'Test'],'custom_pipeline');
+    
+    // Retrieves the full document by ID from elasticsearch.
+    $elasticsearch->retrieveDocument('custom_index','document_1');
+    
+    // Retrieves only the content of key "_source" from the elasticsearch document.
+    $elasticsearch->retrieveDocumentSource('custom_index','document_1');
+    
+    // Deletes the document with ID "document_1" from index "custom_index".
+    // Document is deleted via queue system which uses bulk requests internally. Recommended method to delete documents.
+    $elasticsearch->deleteDocument('custom_index','document_1');
+    
+    // Deletes the document with ID "document_1" from index "custom_index".
+    // Document is deleted immediately from elasticsearch.
+    $elasticsearch->deleteDocumentImmediately('custom_index','document_1');
+```
+
+### Queue System
+
+If you use the recommended methods to index or delete documents, your "commands" are internally stored in a queue. If
+the configured `maxQueueSize` (via constructor of `ElasticsearchConnector`) is reached, or a different pipeline should
+be used for the next document, the queue is executed automatically. If the limit is never reached, you have to
+call `executeQueueImmediately` before the php process is finished. In a framework like symfony this should be done via
+an event listener. In your custom application this method should be executed at the end of your php script or
+application cycle. The method will execute all queued commands within a single bulk request to elasticsearch, which will
+improve your application performance through reduction of http requests.
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    
+    // Executes all queued index or delete commands with a single bulk request.
+    $elasticsearch->executeQueueImmediately();
+```
 
 ## How to search documents
 
-TODO
+The connector offers you a method to search results and a method to count results without fetching all results. These
+methods make use of the base methods from the `Elasticsearch\Client`. The difference is that the connector methods take
+care of the internal index names and convert them to external index names, which can be used for elasticsearch requests.
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    
+    // Executes a search request over all indices.
+    $searchAllResult = $elasticsearch->executeSearch(
+        [
+            'body' => [
+                'query' => [
+                    'match_all' => (object)[] // fix for elasticsearch, because an empty array doesn't work in the api
+                ] 
+            ]
+        ]
+    );
+    
+    // Executes a search request only for the index "custom_index".
+    $searchCustomResult = $elasticsearch->executeSearch(
+        [
+            'body' => [
+                'query' => [
+                    'match_all' => (object)[] // fix for elasticsearch, because an empty array doesn't work in the api
+                ] 
+            ]
+        ],
+        ['custom_index']
+    );
+    
+    // Executes a count request over all indices.
+    $numberOfAllResults = $elasticsearch->executeCount(
+        [
+            'body' => [
+                'query' => [
+                    'match_all' => (object)[] // fix for elasticsearch, because an empty array doesn't work in the api
+                ] 
+            ]
+        ]
+    );
+    
+    // Executes a count request only for the index "custom_index".
+    $numberOfCustomResults = $elasticsearch->executeCount(
+        [
+            'body' => [
+                'query' => [
+                    'match_all' => (object)[] // fix for elasticsearch, because an empty array doesn't work in the api
+                ] 
+            ]
+        ],
+        ['custom_index']
+    );
+```
 
 ## How to handle more complex scenarios
 
-TODO
+The goal of this library is to standardize and simplify common actions with PHP and elasticsearch. More complex
+scenarios has to been solved by your application, but the connector can help you with that.
+
+The connector offers some helper methods, which could be useful for your custom scenario:
+
+```php
+    /** @var \Ellinaut\ElasticsearchConnector\ElasticsearchConnector $elasticsearch */
+    
+    // Returns the configured instance of "Elasticsearch\Client" which is also used by the connector.
+    $connection = $elasticsearch->getConnection();
+    
+    // Get the external index name for elasticsearch requests
+    $externalIndexName = $elasticsearch->getExternalIndexName('custom_index');
+    
+    // Get the internal index name for internal mappings with the result of an elasticsearch request
+    $internalIndexName = $elasticsearch->getInternalIndexName('external_custom_index');
+    
+    // Get the external pipeline name for elasticsearch requests
+    $externalPipelineName = $elasticsearch->getExternalPipelineName('custom_pipeline');
+    
+    // Get the internal pipeline name for internal mappings with the result of an elasticsearch request
+    $internalPipelineName = $elasticsearch->getInternalPipelineName('external_custom_pipeline');
+```
+
+## Error Handling / Response Handling
+
+Sometimes you will need direct access to the elasticsearch responses. This will be useful for custom error handling or
+debugging. You are able to provide an instance of `Ellinaut\ElasticsearchConnector\Connection\ResponseHandlerInterface`
+via constructor to the connector.
+
+A custom response handler could look like this:
+
+```php
+    namespace App\PipelineManager;
+    
+    use Ellinaut\ElasticsearchConnector\Connection\ResponseHandlerInterface;
+
+    class CustomResponseHandler implements ResponseHandlerInterface {
+    
+        /**
+         * @param string $method
+         * @param array $response
+         */
+        public function handleResponse(string $method,array $response) : void{
+            if($method === 'createIndex'){
+                var_dump($response);
+            }
+        }
+    }
+```
+
+The response handler will be called for responses in these methods:
+
+* `IndexManagerInterface::createIndex`
+* `IndexManagerInterface::updateIndex`
+* `IndexManagerTrait::moveDocuments`
+* `IndexManagerInterface::deleteIndex`
+* `PipelineManagerInterface::createPipeline`
+* `PipelineManagerInterface::deletePipeline`
+* `ElasticsearchConnector::indexDocumentImmediately`
+* `ElasticsearchConnector::deleteDocumentImmediately`
+* `ElasticsearchConnector::executeQueueImmediately`
 
 ---
 <small>Ellinaut is powered by [NXI GmbH & Co. KG](https://nxiglobal.com)
