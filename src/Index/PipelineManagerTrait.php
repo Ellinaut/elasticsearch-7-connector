@@ -8,8 +8,13 @@ use Ellinaut\ElasticsearchConnector\Connection\ResponseHandlerInterface;
 /**
  * @author Philipp Marien <philipp@ellinaut.dev>
  */
-interface PipelineManagerInterface
+trait PipelineManagerTrait
 {
+    /**
+     * @return array
+     */
+    abstract protected function getPipelineDefinition(): array;
+
     /**
      * @param string $externalPipelineName
      * @param Client $connection
@@ -19,7 +24,15 @@ interface PipelineManagerInterface
         string $externalPipelineName,
         Client $connection,
         ?ResponseHandlerInterface $responseHandler = null
-    ): void;
+    ): void {
+        $response = $connection->ingest()->putPipeline([
+            'id' => $externalPipelineName,
+            'body' => $this->getPipelineDefinition()
+        ]);
+        if ($responseHandler) {
+            $responseHandler->handleResponse(__METHOD__, $response);
+        }
+    }
 
     /**
      * @param string $externalPipelineName
@@ -30,5 +43,10 @@ interface PipelineManagerInterface
         string $externalPipelineName,
         Client $connection,
         ?ResponseHandlerInterface $responseHandler = null
-    ): void;
+    ): void {
+        $response = $connection->ingest()->deletePipeline(['id' => $externalPipelineName]);
+        if ($responseHandler) {
+            $responseHandler->handleResponse(__METHOD__, $response);
+        }
+    }
 }
