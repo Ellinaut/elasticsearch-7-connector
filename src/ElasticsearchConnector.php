@@ -209,7 +209,7 @@ class ElasticsearchConnector
      */
     public function getDocumentMigrator(string $internalIndexName): ?DocumentMigratorInterface
     {
-        if (!array_key_exists($internalIndexName, $this->indexManagers)) {
+        if (!array_key_exists($internalIndexName, $this->documentMigrators)) {
             return null;
         }
 
